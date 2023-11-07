@@ -141,7 +141,7 @@ class PoolAstralWorker:
                 shutil.copyfile(astral_output_file["incremental"], astral_output_file["updates"])
                 break
             astral_log_file[mtd] = join(partition_output_dir, "astral.%s.log" % mtd)
-            if not Path(astral_const_file[mtd]).is_file() or True: # TODO is GTM
+            if not Path(astral_const_file[mtd]).is_file() or cls.options.gtm: # TODO is GTM
                 s = ["java", "-Xmx%sM" % cls.options.memory, "-Djava.library.path=%s" % cls.astral_libdir, "-jar", cls.astral_mp_exec, "-i", astral_input_file,
                     "-o", astral_output_file[mtd], "-C", "-T", str(cls.options.num_thread)]
             else:

@@ -73,7 +73,7 @@ class PoolPartitionWorker:
                             pcount += 1
                             species_list += [p]
                             f.write(p + "\n")
-                if True: # TODO
+                if cls.options.gtm: # TODO
                     species_list - outgroups_in_partition 
         if pcount <= cls.options.min_placements:
             print("Number of placements on the partition %s is less than or equal to %d. "

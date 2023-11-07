@@ -306,7 +306,7 @@ def decompose(options):
             newTree.root.add_child(crcopy)
             tree_catalog[cl.color] = newTree
 
-    if True: # TODO
+    if not options.gtm: # TODO
         with open(join(options.output_fp, "outgroup_map.json") ,"w") as f:
             f.write(json.dumps(outgroup_map, sort_keys=True, indent=4))
         all_outgroups = []

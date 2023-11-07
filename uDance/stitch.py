@@ -4,8 +4,13 @@ from os.path import join
 import treeswift as ts
 from pathlib import Path
 from uDance.stitch_strategy import strategy_dealer
-from GTM.gtm import main as gtm
 from argparse import Namespace
+
+# Janky GTM import since it's not structured as a package
+# GTM needs to be in the top-level uDance folder
+import sys
+sys.path.insert(1, join(Path(os.path.realpath(__file__)).parent.parent, 'GTM'))
+from gtm import main as gtm
 
 def deroot(tree):
     if len(tree.root.children) > 2:
@@ -50,7 +55,7 @@ def safe_midpoint_reroot(tree, node):
 
 
 def stitch(options):
-    if True: # TODO
+    if options.gtm: # TODO
         # NOTE: I need guide-tree here as well as the constraint trees
         guide_tree = join(options.output_fp, 'backbone.nwk')
         # We need the number of subgroups so that all the constraint trees can be loaded.
