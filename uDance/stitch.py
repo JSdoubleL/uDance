@@ -1,8 +1,11 @@
 import json
+import os
 from os.path import join
 import treeswift as ts
 from pathlib import Path
 from uDance.stitch_strategy import strategy_dealer
+from GTM.gtm import main as gtm
+from argparse import Namespace
 
 def deroot(tree):
     if len(tree.root.children) > 2:
@@ -47,8 +50,28 @@ def safe_midpoint_reroot(tree, node):
 
 
 def stitch(options):
-    for strat in strategy_dealer(options.branch_len):
-        stitch_gen(options, strat)
+    if True: # TODO
+        # NOTE: I need guide-tree here as well as the constraint trees
+        guide_tree = join(options.output_fp, 'backbone.nwk')
+        # We need the number of subgroups so that all the constraint trees can be loaded.
+        # It looks like below these numbers are given by the labels in some tree; however,
+        # I don't want to unnecessarily load a tree into memory, so I'll try getting the value from 
+        # dir names
+        max_c = max([i for i in os.listdir(options.output_fp) if i.isdigit()])
+        constraint_trees = \
+            [strategy_dealer(options.branch_len)[0].get_astral_treename(options.output_fp, c) 
+            for c in range(max_c)]
+        out_tree = join(options.output_fp, 'gtm_output.nwk')
+        gtm_options = Namespace(
+            start=guide_tree,
+            trees=constraint_trees,
+            output=out_tree,
+            mode='convex'
+        )
+        gtm(gtm_options)
+    else:
+        for strat in strategy_dealer(options.branch_len):
+            stitch_gen(options, strat)
     return
 
 

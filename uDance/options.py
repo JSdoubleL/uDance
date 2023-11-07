@@ -15,6 +15,9 @@ def options_config():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-v', '--version', action='store_true', help='print the current version')
     # parser.add_argument('--debug', action='store_true', help='Print the traceback when an exception is raised')
+
+    parser.add_argument('--gtm', action='store_true', dest='gtm_version', help='Enable GTM version of uDance pipeline')
+
     subparsers = parser.add_subparsers(title='commands',
                                        description='mainlines   Strategically choose backbone taxa\n'
                                                    'decompose   Create local inference (RAxML) tasks\n'

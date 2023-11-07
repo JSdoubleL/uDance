@@ -79,7 +79,7 @@ refine_config:
   # larger than this value to designate the first cluster as outliers.
   outlier_difference: 0.1
   # Experimental. Infer branch lengths in substitution unit using ASTRAL. [True, False]
-  infer_branchlen: True
+  infer_branchlen: False
 
 
 

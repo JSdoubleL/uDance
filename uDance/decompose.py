@@ -306,25 +306,26 @@ def decompose(options):
             newTree.root.add_child(crcopy)
             tree_catalog[cl.color] = newTree
 
-    with open(join(options.output_fp, "outgroup_map.json") ,"w") as f:
-        f.write(json.dumps(outgroup_map, sort_keys=True, indent=4))
-    all_outgroups = []
-    for n, dc in outgroup_map.items():
-        if dc['up']:
-            all_outgroups += [leaf.label for leaf in ts.read_tree_newick(dc['up']).traverse_postorder(internal=False)]
-        if dc['children']:
-            for nc, dcc in dc['children'].items():
-                all_outgroups += [leaf.label for leaf in
-                                  ts.read_tree_newick(dcc).traverse_postorder(internal=False)]
-    all_outgroups = list(set(all_outgroups))
-    with open(join(options.output_fp, "all_outgroups.txt") ,"w") as f:
-        f.write("\n".join(all_outgroups) + "\n")
-    for i, t in tree_catalog.items():
-        for e in t.traverse_postorder():
-            if not (hasattr(e, "outgroup") and e.outgroup is True):
-                e.outgroup = False
-            if not (hasattr(e, "resolved_randomly") and e.resolved_randomly is True):
-                e.resolved_randomly = False
+    if True: # TODO
+        with open(join(options.output_fp, "outgroup_map.json") ,"w") as f:
+            f.write(json.dumps(outgroup_map, sort_keys=True, indent=4))
+        all_outgroups = []
+        for n, dc in outgroup_map.items():
+            if dc['up']:
+                all_outgroups += [leaf.label for leaf in ts.read_tree_newick(dc['up']).traverse_postorder(internal=False)]
+            if dc['children']:
+                for nc, dcc in dc['children'].items():
+                    all_outgroups += [leaf.label for leaf in
+                                    ts.read_tree_newick(dcc).traverse_postorder(internal=False)]
+        all_outgroups = list(set(all_outgroups))
+        with open(join(options.output_fp, "all_outgroups.txt") ,"w") as f:
+            f.write("\n".join(all_outgroups) + "\n")
+        for i, t in tree_catalog.items():
+            for e in t.traverse_postorder():
+                if not (hasattr(e, "outgroup") and e.outgroup is True):
+                    e.outgroup = False
+                if not (hasattr(e, "resolved_randomly") and e.resolved_randomly is True):
+                    e.resolved_randomly = False
     # stitching algorithm:
     # preorder traversal color_to_node_map
     # for each node n, find the joint j in tstree.
