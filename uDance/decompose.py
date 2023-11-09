@@ -320,12 +320,12 @@ def decompose(options):
         all_outgroups = list(set(all_outgroups))
         with open(join(options.output_fp, "all_outgroups.txt") ,"w") as f:
             f.write("\n".join(all_outgroups) + "\n")
-        for i, t in tree_catalog.items():
-            for e in t.traverse_postorder():
-                if not (hasattr(e, "outgroup") and e.outgroup is True):
-                    e.outgroup = False
-                if not (hasattr(e, "resolved_randomly") and e.resolved_randomly is True):
-                    e.resolved_randomly = False
+    for i, t in tree_catalog.items():
+        for e in t.traverse_postorder():
+            if not (hasattr(e, "outgroup") and e.outgroup is True):
+                e.outgroup = False
+            if not (hasattr(e, "resolved_randomly") and e.resolved_randomly is True):
+                e.resolved_randomly = False
     # stitching algorithm:
     # preorder traversal color_to_node_map
     # for each node n, find the joint j in tstree.

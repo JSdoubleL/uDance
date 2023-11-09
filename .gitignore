@@ -3,3 +3,7 @@ didactic/__pycache__/
 wol2
 **/*.class
 uDance/__pycache__/
+*/output/
+*/*output/
+*/*.log
+*/*.log.bak

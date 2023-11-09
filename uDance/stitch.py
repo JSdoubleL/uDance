@@ -57,16 +57,17 @@ def safe_midpoint_reroot(tree, node):
 def stitch(options):
     if options.gtm: # TODO
         # NOTE: I need guide-tree here as well as the constraint trees
-        guide_tree = join(options.output_fp, 'backbone.nwk')
+        guide_tree = join(Path(options.output_fp).parent, 'backbone.nwk')
         # We need the number of subgroups so that all the constraint trees can be loaded.
         # It looks like below these numbers are given by the labels in some tree; however,
         # I don't want to unnecessarily load a tree into memory, so I'll try getting the value from 
         # dir names
-        max_c = max([i for i in os.listdir(options.output_fp) if i.isdigit()])
+        max_c = max([int(i) for i in os.listdir(options.output_fp) if i.isdigit()])
         constraint_trees = \
-            [strategy_dealer(options.branch_len)[0].get_astral_treename(options.output_fp, c) 
-            for c in range(max_c)]
-        out_tree = join(options.output_fp, 'gtm_output.nwk')
+            [strategy_dealer(options.branch_len)[0].get_astral_treename(options.output_fp, str(c)) 
+            for c in range(max_c + 1)]
+        out_tree = join(options.output_fp, 'udance.gtm.nwk')
+        #print(guide_tree, constraint_trees, out_tree, sep='\n')
         gtm_options = Namespace(
             start=guide_tree,
             trees=constraint_trees,

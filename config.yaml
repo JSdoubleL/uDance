@@ -3,6 +3,9 @@ workdir: "datasmall"
 # options are ["nuc", "prot"]
 chartype: "nuc"
 
+# options are ["gtm", "standard"]
+stitch_method: "gtm"
+
 # options are:
 # "de-novo": backbone species will be selected using mainlines (see the mainlines_config below)
 # "tree": workdir/backbone.nwk is used as the backbone. Therefore genetreeinfer&refine_bb will be skipped
@@ -79,6 +82,7 @@ refine_config:
   # larger than this value to designate the first cluster as outliers.
   outlier_difference: 0.1
   # Experimental. Infer branch lengths in substitution unit using ASTRAL. [True, False]
+  # This needs to be False if you are using GTM
   infer_branchlen: False
 
 

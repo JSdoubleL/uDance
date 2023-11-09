@@ -1,0 +1,3 @@
+[submodule "GTM"]
+	path = GTM
+	url = https://github.com/vlasmirnov/GTM.git

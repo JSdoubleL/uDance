@@ -3,7 +3,7 @@ import os
 
 #include: "workflows/decompose.smk"
 wdr = config["workdir"]
-outdir = os.path.join(wdr, "output")
+outdir = os.path.join(wdr, "udance_gtm_output" if config["stitch_method"] == "gtm" else "udance_output")
 alndir = os.path.join(wdr, "alignments")
 bbspec = os.path.join(wdr, "species.txt")
 input_bbone = os.path.join(wdr, "backbone.nwk")
@@ -18,7 +18,8 @@ udance_logpath = os.path.abspath(os.path.join(wdr, "udance.log"))
 localrules: all, clean, trimcollect, copybb
 
 rule all:
-    input: expand("%s/udance.{approach}.nwk" % outdir, approach=["incremental", "updates"])
+    input: expand("%s/udance.{approach}.nwk" % outdir, approach=["incremental", "updates"]) if not config["stitch_method"] == "gtm"
+        else "%s/udance.gtm.nwk" % outdir
 
 onstart:
     shell( "if [ -f '{udance_logpath}' ]; then echo '{udance_logpath} already exists."
@@ -135,14 +136,15 @@ if config["backbone"] != "tree":
             c=config["refine_config"]["contract"],
             occup = config["refine_config"]["occupancy"],
             ol=config["refine_config"]["outlier_sizelimit"],
-            od=config["refine_config"]["outlier_difference"]
+            od=config["refine_config"]["outlier_difference"],
+            gtm="--gtm" if config["stitch_method"] == "gtm" else ""
         resources: cpus=config["resources"]["cores"],
                    mem_mb=config["resources"]["large_memory"]
         benchmark: "%s/benchmarks/refine_copy_bb.txt" % outdir
         shell:
             '''
                 (
-                python run_udance.py refine -p {outdir}/backbone/0 -m {params.method} -M {resources.mem_mb} -c {params.c} -o {params.occup} -T {resources.cpus} -l {params.ol} -d {params.od}
+                python run_udance.py {params.gtm} refine  -p {outdir}/backbone/0 -m {params.method} -M {resources.mem_mb} -c {params.c} -o {params.occup} -T {resources.cpus} -l {params.ol} -d {params.od}
                 nw_reroot -d {outdir}/backbone/0/astral_output.incremental.nwk > {output}
                 ) >> {udance_logpath} 2>&1
             '''
@@ -220,7 +222,8 @@ checkpoint decompose:
         frag=config["prep_config"]["fraglength"],
         pra=config["prep_config"]["pruneafter"],
         mps=config["prep_config"]["min_placements"],
-        char=config["chartype"]
+        char=config["chartype"],
+        gtm="--gtm" if config["stitch_method"] == "gtm" else ""
 
     resources: cpus=config["resources"]["cores"],
                mem_mb=config["resources"]["large_memory"]
@@ -239,15 +242,17 @@ checkpoint decompose:
                 echo "Cluster size is set to $clustsz (user-choice)"
             fi
             if [ "{params.char}" == "nuc" ]; then
-                python run_udance.py decompose -s {input.ind} -o {outdir}/udance -t $clustsz -j {input.j} \
+                python run_udance.py {params.gtm} decompose -s {input.ind} -o {outdir}/udance -t $clustsz -j {input.j} \
                 -m {params.method} -T {resources.cpus} -l {params.sub} -f {params.frag} -e {params.edg} \
                 --minplacements {params.mps}
             else
-                python run_udance.py decompose -p -s {input.ind} -o {outdir}/udance -t $clustsz -j {input.j} \
+                python run_udance.py {params.gtm} decompose -p -s {input.ind} -o {outdir}/udance -t $clustsz -j {input.j} \
                 -m {params.method} -T {resources.cpus} -l {params.sub} -f {params.frag} -e {params.edg} \
                 --minplacements {params.mps}
             fi
-            python prune_similar.py -T {resources.cpus} -o {outdir}/udance -S {params.pra}
+            if [ -z "{params.gtm}" ]; then
+                python prune_similar.py -T {resources.cpus} -o {outdir}/udance -S {params.pra}
+            fi
             if [  -f {outdir}/udance/dedupe_map.txt ]; then 
                 cat {outdir}/udance/dedupe_map.txt > {outdir}/dedupe_map.txt 
             fi 
@@ -294,7 +299,8 @@ rule refine:
             c=config["refine_config"]["contract"],
             occup=config["refine_config"]["occupancy"],
             ol=config["refine_config"]["outlier_sizelimit"],
-            od=config["refine_config"]["outlier_difference"]
+            od=config["refine_config"]["outlier_difference"],
+            gtm="--gtm" if config["stitch_method"] == "gtm" else ""
     resources: cpus=config["resources"]["cores"],
                mem_mb=config["resources"]["large_memory"]
     benchmark: "%s/benchmarks/refine.{cluster}.txt" % outdir
@@ -302,7 +308,7 @@ rule refine:
     shell:
         """
             (
-            python run_udance.py refine -p {outdir}/udance/{wildcards.cluster} -m {params.method} -M {resources.mem_mb} -c {params.c} -o {params.occup} -T {resources.cpus} -l {params.ol} -d {params.od}
+            python run_udance.py {params.gtm} refine -p {outdir}/udance/{wildcards.cluster} -m {params.method} -M {resources.mem_mb} -c {params.c} -o {params.occup} -T {resources.cpus} -l {params.ol} -d {params.od}
             ) >> {udance_logpath} 2>&1
         """
 
@@ -341,16 +347,20 @@ def aggregate_stitch_input(wildcards):
 
 rule stitch:
     input: aggregate_stitch_input
-    output: expand("%s/udance.{approach}.nwk" % outdir, approach=["incremental", "updates"])
-    params: b = config["refine_config"]["infer_branchlen"]
+    output: 
+        expand("%s/udance.{approach}.nwk" % outdir, approach=["incremental", "updates"]) if not config["stitch_method"] == "gtm"
+        else "%s/udance.gtm.nwk" % outdir
+    params: 
+        b = config["refine_config"]["infer_branchlen"],
+        gtm="--gtm" if config["stitch_method"] == "gtm" else ""
     benchmark: "%s/benchmarks/stitch.txt" % outdir
     shell:
         """
            (
             if [[ "{params.b}" == "False" ]] ; then
-                python run_udance.py stitch -o {outdir}/udance
+                python run_udance.py {params.gtm} stitch -o {outdir}/udance
             else
-                python run_udance.py stitch -o {outdir}/udance -b
+                python run_udance.py {params.gtm} stitch -o {outdir}/udance -b
             fi
             cp {outdir}/udance/udance.*.nwk {outdir}
            ) >> {udance_logpath} 2>&1
