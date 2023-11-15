@@ -150,6 +150,7 @@ def decompose(options):
 
     # min_tree_coloring_sum(tstree, float(options.threshold))
     min_tree_coloring_sum_max(tstree, float(options.threshold), options.edge_threshold)
+
     occupancy, num_genes = count_occupancy(options.alignment_dir_fp, options.protein_seqs)
 
     for e in tstree.traverse_postorder(internal=False):
@@ -158,155 +159,195 @@ def decompose(options):
         else:
             e.occupancy = 0
 
-    set_closest_three_directions(tstree, num_genes * options.occupancy_threshold)
-
-    # colors = {}
-    # for n in tstree.traverse_postorder():
-    #     if n.color not in colors:
-    #         colors[n.color] = [n]
-    #     else:
-    #         colors[n.color] += [n]
-
     Path(options.output_fp).mkdir(parents=True, exist_ok=True)
-    color_spanning_tree, color_to_node_map = build_color_spanning_tree(tstree)
-    color_spanning_tree.write_tree_newick(join(options.output_fp, "color_spanning_tree.nwk"))
-    copyts = tstree.extract_tree_with(labels=tstree.labels())
-    for n in copyts.traverse_preorder():
-        n.outgroup = False
+    if options.gtm:
+        color_to_species = {}
+        for l in tstree.traverse_postorder():
+            # if l.is_root():
+            #     assert not hasattr(l, 'placements') or len(l.placements) == 0
+            # if hasattr(l, 'placements'):
+            #     print(l.placements, l.color)
+            if l.is_leaf():
+                color_to_species[l.color] = color_to_species.get(l.color, []) + [l.label]
+            if hasattr(l, 'placements') and not l.is_root():
+                for p in l.placements:
+                    l.parent.add_child(ts.Node(p))
+                color_to_species[l.color] += l.placements
 
-    traversal = list(zip(tstree.traverse_preorder(), copyts.traverse_preorder()))
-    tree_catalog = {}
+        # for c in color_to_species:
+        #     with open(f"/home/jsdoublel/coding/uDance_workdir/c{c}.txt", "w") as f:
+        #         f.writelines([l + "\n" for l in color_to_species[c]])
+                # copy over placements
+        #assert all([n.get_label()[:7] != '-------' for n in tstree.traverse_postorder()]), "cannot have leading '-------' in node label (don't ask)"
 
-    outgroup_map = {-1: {"up": None, "ownsup": False, "children": dict()}}
-    for n, ncopy in traversal:
-        ncopy.resolved_randomly = n.resolved_randomly
-        ncopy.placements = n.placements
-        if not n.is_root() and hasattr(n, "edge_index"):
-            ncopy.edge_index = n.edge_index
-        if n.is_leaf():
-            continue
-        cl, cr = n.children
-        clcopy, crcopy = ncopy.children
+        # placement_map = dict()
+        # for i, n in enumerate(tstree.traverse_postorder()):
+        #     if not hasattr(n, 'label'):
+        #         n.set_label(f'-------{i}')
+        #     if hasattr(n, 'placements'):
+        #         placement_map[n.get_label()] = n.placements
+        #         assert n.color == n.parent.color, "pls send help"
 
-        #                   C2
-        # case 1     C1  <
-        #                   C3
-        if cl.color != n.color and cr.color != n.color and cl.color != cr.color:
-            ncopy.remove_child(clcopy)
-            outcl = copy.deepcopy(cl.repr_tree["down"])
-            outgroup_map[n.color]["children"][cl.color] = outcl.newick()
-            ncopy.add_child(outcl.root)
+        tree_catalog = {k:tstree.extract_tree_with(labels=v) for k, v in color_to_species.items()}
 
+        # for _, t in tree_catalog.items():
+        #     for n in t.traverse_postorder():
+        #         if n.get_label() in placement_map:
+        #             n.placements = placement_map[n.get_label()]
 
-            ncopy.remove_child(crcopy)
-            outcr = copy.deepcopy(cr.repr_tree["down"])
-            outgroup_map[n.color]["children"][cr.color] = outcr.newick()
-            ncopy.add_child(outcr.root)
+        # create color spanning tree because it's necessary for snakemake
+        open(join(options.output_fp, "color_spanning_tree.nwk"), "a").close()
+    #TODO above function might return disjoint clustering
+    else:
+        set_closest_three_directions(tstree, num_genes * options.occupancy_threshold)
 
-            newTreeL = ts.Tree()
-            newTreeL.is_rooted = False
-            newTreeL.root.outgroup = False
-            outcr = copy.deepcopy(cr.repr_tree["down"])
-            newTreeL.root.add_child(outcr.root)
-            outup = copy.deepcopy(n.repr_tree["up"])
-            if outup:
-                newTreeL.root.add_child(outup.root)
-            outgroup_map[cl.color] = {"up": newTreeL.newick(), "ownsup": True, "children": dict()}
-            newTreeL.root.add_child(clcopy)
-            tree_catalog[cl.color] = newTreeL
+        # colors = {}
+        # for n in tstree.traverse_postorder():
+        #     if n.color not in colors:
+        #         colors[n.color] = [n]
+        #     else:
+        #         colors[n.color] += [n]
 
-            newTreeR = ts.Tree()
-            newTreeR.is_rooted = False
-            newTreeR.root.outgroup = False
-            outcl = copy.deepcopy(cl.repr_tree["down"])
-            newTreeR.root.add_child(outcl.root)
-            outup = copy.deepcopy(n.repr_tree["up"])
-            if outup:
-                newTreeR.root.add_child(outup.root)
-            outgroup_map[cr.color] = {"up": newTreeR.newick(), "ownsup": True, "children": dict()}
-            newTreeR.root.add_child(crcopy)
-            tree_catalog[cr.color] = newTreeR
+        Path(options.output_fp).mkdir(parents=True, exist_ok=True)
+        color_spanning_tree, color_to_node_map = build_color_spanning_tree(tstree)
+        color_spanning_tree.write_tree_newick(join(options.output_fp, "color_spanning_tree.nwk"))
+        copyts = tstree.extract_tree_with(labels=tstree.labels())
+        for n in copyts.traverse_preorder():
+            n.outgroup = False
 
-        #                   C1
-        # case 2     C1  <
-        #                   C3
-        if cl.color != n.color and cr.color == n.color and cl.color != cr.color:
-            ncopy.remove_child(clcopy)
-            outcl = copy.deepcopy(cl.repr_tree["down"])
-            outgroup_map[n.color]["children"][cl.color] = outcl.newick()
-            ncopy.add_child(outcl.root)
+        traversal = list(zip(tstree.traverse_preorder(), copyts.traverse_preorder()))
+        tree_catalog = {}
 
-            newTreeL = ts.Tree()
-            newTreeL.is_rooted = False
-            newTreeL.root.outgroup = False
-            outcr = copy.deepcopy(cr.repr_tree["down"])
-            newTreeL.root.add_child(outcr.root)
-            outup = copy.deepcopy(n.repr_tree["up"])
-            if outup:
-                newTreeL.root.add_child(outup.root)
-            outgroup_map[cl.color] = {"up": newTreeL.newick(), "ownsup": True, "children": dict()}
-            newTreeL.root.add_child(clcopy)
-            tree_catalog[cl.color] = newTreeL
+        outgroup_map = {-1: {"up": None, "ownsup": False, "children": dict()}}
+        for n, ncopy in traversal:
+            ncopy.resolved_randomly = n.resolved_randomly
+            ncopy.placements = n.placements
+            if not n.is_root() and hasattr(n, "edge_index"):
+                ncopy.edge_index = n.edge_index
+            if n.is_leaf():
+                continue
+            cl, cr = n.children
+            clcopy, crcopy = ncopy.children
 
-        #                   C3
-        # case 3     C1  <
-        #                   C1
-        if cl.color == n.color and cr.color != n.color and cl.color != cr.color:
-            ncopy.remove_child(crcopy)
-            outcr = copy.deepcopy(cr.repr_tree["down"])
-            outgroup_map[n.color]["children"][cr.color] = outcr.newick()
-            ncopy.add_child(outcr.root)
-
-            newTreeR = ts.Tree()
-            newTreeR.is_rooted = False
-            newTreeR.root.outgroup = False
-            outcl = copy.deepcopy(cl.repr_tree["down"])
-            newTreeR.root.add_child(outcl.root)
-            outup = copy.deepcopy(n.repr_tree["up"])
-            if outup:
-                newTreeR.root.add_child(outup.root)
-            outgroup_map[cr.color] = {"up": newTreeR.newick(), "ownsup": True,  "children": dict()}
-            newTreeR.root.add_child(crcopy)
-            tree_catalog[cr.color] = newTreeR
-
-        #                   C3
-        # case 4     C1  <
-        #                   C3
-        if cl.color != n.color and cr.color != n.color and cl.color == cr.color:
-            ncopy.remove_child(clcopy)
-            outcl = copy.deepcopy(cl.repr_tree["down"])
-            ncopy.add_child(outcl.root)
-
-            ncopy.remove_child(crcopy)
-            outcr = copy.deepcopy(cr.repr_tree["down"])
-            ncopy.add_child(outcr.root)
-
-            # special case for outgroup map
-            # create a throwaway tree to print its newick
-            newTreeR = ts.Tree()
-            newTreeR.is_rooted = False
-            newTreeR.root.outgroup = False
-            outcl = copy.deepcopy(cl.repr_tree["down"])
-            newTreeR.root.add_child(outcl.root)
-            outcr = copy.deepcopy(cr.repr_tree["down"])
-            newTreeR.root.add_child(outcr.root)
-            outgroup_map[n.color]["children"][cr.color] = newTreeR.newick()
+            #                   C2
+            # case 1     C1  <
+            #                   C3
+            if cl.color != n.color and cr.color != n.color and cl.color != cr.color:
+                ncopy.remove_child(clcopy)
+                outcl = copy.deepcopy(cl.repr_tree["down"])
+                outgroup_map[n.color]["children"][cl.color] = outcl.newick()
+                ncopy.add_child(outcl.root)
 
 
-            newTree = ts.Tree()
-            newTree.is_rooted = False
-            newTree.root.outgroup = False
-            outup = copy.deepcopy(n.repr_tree["up"])
-            if outup:
-                newTree.root.add_child(outup.root)
-                outgroup_map[cr.color] = {"up": newTree.newick(), "ownsup": False, "children": dict()}
-            else:
-                outgroup_map[cr.color] = {"up": None, "ownsup": False, "children": dict()}
-            newTree.root.add_child(clcopy)
-            newTree.root.add_child(crcopy)
-            tree_catalog[cl.color] = newTree
+                ncopy.remove_child(crcopy)
+                outcr = copy.deepcopy(cr.repr_tree["down"])
+                outgroup_map[n.color]["children"][cr.color] = outcr.newick()
+                ncopy.add_child(outcr.root)
 
-    if not options.gtm: # TODO
+                newTreeL = ts.Tree()
+                newTreeL.is_rooted = False
+                newTreeL.root.outgroup = False
+                outcr = copy.deepcopy(cr.repr_tree["down"])
+                newTreeL.root.add_child(outcr.root)
+                outup = copy.deepcopy(n.repr_tree["up"])
+                if outup:
+                    newTreeL.root.add_child(outup.root)
+                outgroup_map[cl.color] = {"up": newTreeL.newick(), "ownsup": True, "children": dict()}
+                newTreeL.root.add_child(clcopy)
+                tree_catalog[cl.color] = newTreeL
+
+                newTreeR = ts.Tree()
+                newTreeR.is_rooted = False
+                newTreeR.root.outgroup = False
+                outcl = copy.deepcopy(cl.repr_tree["down"])
+                newTreeR.root.add_child(outcl.root)
+                outup = copy.deepcopy(n.repr_tree["up"])
+                if outup:
+                    newTreeR.root.add_child(outup.root)
+                outgroup_map[cr.color] = {"up": newTreeR.newick(), "ownsup": True, "children": dict()}
+                newTreeR.root.add_child(crcopy)
+                tree_catalog[cr.color] = newTreeR
+
+            #                   C1
+            # case 2     C1  <
+            #                   C3
+            if cl.color != n.color and cr.color == n.color and cl.color != cr.color:
+                ncopy.remove_child(clcopy)
+                outcl = copy.deepcopy(cl.repr_tree["down"])
+                outgroup_map[n.color]["children"][cl.color] = outcl.newick()
+                ncopy.add_child(outcl.root)
+
+                newTreeL = ts.Tree()
+                newTreeL.is_rooted = False
+                newTreeL.root.outgroup = False
+                outcr = copy.deepcopy(cr.repr_tree["down"])
+                newTreeL.root.add_child(outcr.root)
+                outup = copy.deepcopy(n.repr_tree["up"])
+                if outup:
+                    newTreeL.root.add_child(outup.root)
+                outgroup_map[cl.color] = {"up": newTreeL.newick(), "ownsup": True, "children": dict()}
+                newTreeL.root.add_child(clcopy)
+                tree_catalog[cl.color] = newTreeL
+
+            #                   C3
+            # case 3     C1  <
+            #                   C1
+            if cl.color == n.color and cr.color != n.color and cl.color != cr.color:
+                ncopy.remove_child(crcopy)
+                outcr = copy.deepcopy(cr.repr_tree["down"])
+                outgroup_map[n.color]["children"][cr.color] = outcr.newick()
+                ncopy.add_child(outcr.root)
+
+                newTreeR = ts.Tree()
+                newTreeR.is_rooted = False
+                newTreeR.root.outgroup = False
+                outcl = copy.deepcopy(cl.repr_tree["down"])
+                newTreeR.root.add_child(outcl.root)
+                outup = copy.deepcopy(n.repr_tree["up"])
+                if outup:
+                    newTreeR.root.add_child(outup.root)
+                outgroup_map[cr.color] = {"up": newTreeR.newick(), "ownsup": True,  "children": dict()}
+                newTreeR.root.add_child(crcopy)
+                tree_catalog[cr.color] = newTreeR
+
+            #                   C3
+            # case 4     C1  <
+            #                   C3
+            if cl.color != n.color and cr.color != n.color and cl.color == cr.color:
+                ncopy.remove_child(clcopy)
+                outcl = copy.deepcopy(cl.repr_tree["down"])
+                ncopy.add_child(outcl.root)
+
+                ncopy.remove_child(crcopy)
+                outcr = copy.deepcopy(cr.repr_tree["down"])
+                ncopy.add_child(outcr.root)
+
+                # special case for outgroup map
+                # create a throwaway tree to print its newick
+                newTreeR = ts.Tree()
+                newTreeR.is_rooted = False
+                newTreeR.root.outgroup = False
+                outcl = copy.deepcopy(cl.repr_tree["down"])
+                newTreeR.root.add_child(outcl.root)
+                outcr = copy.deepcopy(cr.repr_tree["down"])
+                newTreeR.root.add_child(outcr.root)
+                outgroup_map[n.color]["children"][cr.color] = newTreeR.newick()
+
+
+                newTree = ts.Tree()
+                newTree.is_rooted = False
+                newTree.root.outgroup = False
+                outup = copy.deepcopy(n.repr_tree["up"])
+                if outup:
+                    newTree.root.add_child(outup.root)
+                    outgroup_map[cr.color] = {"up": newTree.newick(), "ownsup": False, "children": dict()}
+                else:
+                    outgroup_map[cr.color] = {"up": None, "ownsup": False, "children": dict()}
+                newTree.root.add_child(clcopy)
+                newTree.root.add_child(crcopy)
+                tree_catalog[cl.color] = newTree
+
+    #  if not options.gtm: # TODO
         with open(join(options.output_fp, "outgroup_map.json") ,"w") as f:
             f.write(json.dumps(outgroup_map, sort_keys=True, indent=4))
         all_outgroups = []
@@ -320,12 +361,12 @@ def decompose(options):
         all_outgroups = list(set(all_outgroups))
         with open(join(options.output_fp, "all_outgroups.txt") ,"w") as f:
             f.write("\n".join(all_outgroups) + "\n")
-    for i, t in tree_catalog.items():
-        for e in t.traverse_postorder():
-            if not (hasattr(e, "outgroup") and e.outgroup is True):
-                e.outgroup = False
-            if not (hasattr(e, "resolved_randomly") and e.resolved_randomly is True):
-                e.resolved_randomly = False
+        for i, t in tree_catalog.items():
+            for e in t.traverse_postorder():
+                if not (hasattr(e, "outgroup") and e.outgroup is True):
+                    e.outgroup = False
+                if not (hasattr(e, "resolved_randomly") and e.resolved_randomly is True):
+                    e.resolved_randomly = False
     # stitching algorithm:
     # preorder traversal color_to_node_map
     # for each node n, find the joint j in tstree.
@@ -366,15 +407,15 @@ def decompose(options):
             js.write(par + "\t" + gene + "\t" + str(count) + "\n")
 
 
-    # TODO a bipartition for each alignment
-    for i, j in tree_catalog.items():
-        count = 0
-        for n in j.traverse_postorder():
-            try:
-                if n.is_leaf():
-                    count += 1
-                if n.outgroup is False and hasattr(n, 'placements'):
-                    count += len(n.placements)
-            except e:
-                pass
-        print(i, count)
+    # # TODO a bipartition for each alignment
+    # for i, j in tree_catalog.items():
+    #     count = 0
+    #     for n in j.traverse_postorder():
+    #         try:
+    #             if n.is_leaf():
+    #                 count += 1
+    #             if n.outgroup is False and hasattr(n, 'placements'):
+    #                 count += len(n.placements)
+    #         except e:
+    #             pass
+    #     print(i, count)
