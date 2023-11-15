@@ -41,20 +41,21 @@ class PoolPartitionWorker:
             a_file.write("\n")
 
         # find all outgroups TODO maybe remove more code here
-        with open(join(cls.options.output_fp, "all_outgroups.txt")) as file:
-            lines = file.readlines()
-            outgroups_all = set([line.rstrip() for line in lines])
-        outgroups_in_partition = [n.label for n in j.traverse_postorder() if n.label in outgroups_all]
-        if len(outgroups_in_partition) >= 4:
-            constraint = j.extract_tree_with(outgroups_in_partition, suppress_unifurcations=True)
-            constraint.is_rooted = False
-            bipartition_path = join(partition_output_dir, "bipartition.fasta")
-            with open(bipartition_path, "w") as f:
-                f.write(compute_bipartition_alignment(constraint.__str__()))
-            raxml_constraint_path = join(partition_output_dir, "raxml_constraint.nwk")
-            constraint.write_tree_newick(raxml_constraint_path)
-            with open(raxml_constraint_path, "a") as a_file:
-                a_file.write("\n")
+        if not cls.options.gtm:
+            with open(join(cls.options.output_fp, "all_outgroups.txt")) as file:
+                lines = file.readlines()
+                outgroups_all = set([line.rstrip() for line in lines])
+            outgroups_in_partition = [n.label for n in j.traverse_postorder() if n.label in outgroups_all]
+            if len(outgroups_in_partition) >= 4:
+                constraint = j.extract_tree_with(outgroups_in_partition, suppress_unifurcations=True)
+                constraint.is_rooted = False
+                bipartition_path = join(partition_output_dir, "bipartition.fasta")
+                with open(bipartition_path, "w") as f:
+                    f.write(compute_bipartition_alignment(constraint.__str__()))
+                raxml_constraint_path = join(partition_output_dir, "raxml_constraint.nwk")
+                constraint.write_tree_newick(raxml_constraint_path)
+                with open(raxml_constraint_path, "a") as a_file:
+                    a_file.write("\n")
 
         species_list_path = join(partition_output_dir, "species.txt")
         edgeindices_list_path = join(partition_output_dir, "edgeindices.txt")

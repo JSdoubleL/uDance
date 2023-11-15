@@ -172,7 +172,7 @@ def decompose(options):
             if hasattr(l, 'placements') and not l.is_root():
                 for p in l.placements:
                     l.parent.add_child(ts.Node(p))
-                color_to_species[l.color] += l.placements
+                color_to_species[l.color] = color_to_species.get(l.color, []) + l.placements
 
         # for c in color_to_species:
         #     with open(f"/home/jsdoublel/coding/uDance_workdir/c{c}.txt", "w") as f:
