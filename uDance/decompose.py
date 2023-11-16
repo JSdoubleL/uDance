@@ -220,8 +220,8 @@ def decompose(options):
                 #assert n.color == n.parent.color, "pls send help"
 
         placement_length = len([p for l, pl in placement_map.items() for p in pl])
-        assert num_placements == placement_length, f"{num_placements} != {placement_length}"
-        tree_catalog = {k:tstree.extract_tree_with(labels=v) for k, v in color_to_species.items()}
+        assert num_placements == placement_length, f"{num_placements} != {placement_length}; some taxa were never mapped onto the backbone"
+        tree_catalog = {k:tstree.extract_tree_with(labels=v, suppress_unifurcations=False) for k, v in color_to_species.items()}
         
         # reattach placements
         for _, t in tree_catalog.items():
@@ -232,7 +232,7 @@ def decompose(options):
                     n.placements = []
 
         placement_length = len([p for _, t in tree_catalog.items() for n in t.traverse_postorder() for p in n.placements])
-        assert num_placements == placement_length, f"{num_placements} != {placement_length}"
+        assert num_placements == placement_length, f"{num_placements} != {placement_length}; some taxa were lost when decomposing the tree"
         # create color spanning tree because it's necessary for snakemake
         #open(join(options.output_fp, "color_spanning_tree.nwk"), "a").close()
     #TODO above function might return disjoint clustering
