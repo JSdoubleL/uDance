@@ -195,17 +195,22 @@ def decompose(options):
         #         f.writelines([l + "\n" for l in color_to_species[c]])
                 # copy over placements
         #assert all([n.get_label()[:7] != '-------' for n in tstree.traverse_postorder()]), "cannot have leading '-------' in node label (don't ask)"
-        tstree.root.color = tstree.root.child_nodes()[0].color
+        #tstree.root.color = tstree.root.child_nodes()[0].color
         placement_map = dict()
         for i, n in enumerate(tstree.traverse_postorder()):
             if not hasattr(n, 'label'):
                 n.set_label(f'-------{i}')
             if hasattr(n, 'placements'):
-                cur = n
-                while not cur.is_root() and cur.color != cur.parent.color:
-                    assert not cur.is_leaf(), f"{cur.color} {cur.parent.color}" # hopefully there aren't any leaves in an island by themselves
-                    cur = cur.child_nodes()[0]
-                placement_map[cur.get_label()] = placement_map.get(cur.get_label(), []) + n.placements
+                for n2, _ in n.traverse_bfs():
+                    if not n2.is_root() and n2.color == n2.parent.color:
+                        placement_map[n2.get_label()] = placement_map.get(n2.get_label(), []) + n.placements
+                        break
+                # cur = n
+                # while not cur.is_root() and cur.color != cur.parent.color:
+                #     cur.traverse_bfs()
+                #     assert not cur.is_leaf(), f"{cur.color} {cur.parent.color}" # hopefully there aren't any leaves in an island by themselves
+                #     cur = cur.child_nodes()[0]
+                # placement_map[cur.get_label()] = placement_map.get(cur.get_label(), []) + n.placements
                 # if not n.is_root() and n.color == n.parent.color:
                 #     placement_map[n.get_label()] = placement_map.get(n.get_label(), []) + n.placements
                 # elif n.is_leaf():
