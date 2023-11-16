@@ -160,46 +160,7 @@ def decompose(options):
             e.occupancy = 0
 
     Path(options.output_fp).mkdir(parents=True, exist_ok=True)
-    if options.gtm:
-        color_to_species = {}
-        for l in tstree.traverse_postorder():
-            # if l.is_root():
-            #     assert not hasattr(l, 'placements') or len(l.placements) == 0
-            # if hasattr(l, 'placements'):
-            #     print(l.placements, l.color)
-            if l.is_leaf():
-                color_to_species[l.color] = color_to_species.get(l.color, []) + [l.label]
-            if hasattr(l, 'placements') and not l.is_root():
-                for p in l.placements:
-                    l.parent.add_child(ts.Node(p))
-                color_to_species[l.color] = color_to_species.get(l.color, []) + l.placements
-
-        # for c in color_to_species:
-        #     with open(f"/home/jsdoublel/coding/uDance_workdir/c{c}.txt", "w") as f:
-        #         f.writelines([l + "\n" for l in color_to_species[c]])
-                # copy over placements
-        #assert all([n.get_label()[:7] != '-------' for n in tstree.traverse_postorder()]), "cannot have leading '-------' in node label (don't ask)"
-
-        # placement_map = dict()
-        # for i, n in enumerate(tstree.traverse_postorder()):
-        #     if not hasattr(n, 'label'):
-        #         n.set_label(f'-------{i}')
-        #     if hasattr(n, 'placements'):
-        #         placement_map[n.get_label()] = n.placements
-        #         assert n.color == n.parent.color, "pls send help"
-
-        tree_catalog = {k:tstree.extract_tree_with(labels=v) for k, v in color_to_species.items()}
-
-        # for _, t in tree_catalog.items():
-        #     for n in t.traverse_postorder():
-        #         if n.get_label() in placement_map:
-        #             n.placements = placement_map[n.get_label()]
-
-        # create color spanning tree because it's necessary for snakemake
-        open(join(options.output_fp, "color_spanning_tree.nwk"), "a").close()
-    #TODO above function might return disjoint clustering
-    else:
-        set_closest_three_directions(tstree, num_genes * options.occupancy_threshold)
+    set_closest_three_directions(tstree, num_genes * options.occupancy_threshold)
 
         # colors = {}
         # for n in tstree.traverse_postorder():
@@ -208,9 +169,65 @@ def decompose(options):
         #     else:
         #         colors[n.color] += [n]
 
-        Path(options.output_fp).mkdir(parents=True, exist_ok=True)
-        color_spanning_tree, color_to_node_map = build_color_spanning_tree(tstree)
-        color_spanning_tree.write_tree_newick(join(options.output_fp, "color_spanning_tree.nwk"))
+    Path(options.output_fp).mkdir(parents=True, exist_ok=True)
+    color_spanning_tree, color_to_node_map = build_color_spanning_tree(tstree)
+    color_spanning_tree.write_tree_newick(join(options.output_fp, "color_spanning_tree.nwk"))
+
+    if options.gtm:
+        color_to_species = {}
+        num_placements = 0
+        for l in tstree.traverse_postorder():
+            # if l.is_root():
+            #     assert not hasattr(l, 'placements') or len(l.placements) == 0
+            # if hasattr(l, 'placements'):
+            #     print(l.placements, l.color)
+            if l.is_leaf():
+                color_to_species[l.color] = color_to_species.get(l.color, []) + [l.label]
+            if hasattr(l, 'placements'):
+                num_placements += len(l.placements)
+            # if hasattr(l, 'placements') and not l.is_root():
+            #     for p in l.placements:
+            #         l.parent.add_child(ts.Node(p))
+            #     color_to_species[l.color] = color_to_species.get(l.color, []) + l.placements
+
+        # for c in color_to_species:
+        #     with open(f"/home/jsdoublel/coding/uDance_workdir/c{c}.txt", "w") as f:
+        #         f.writelines([l + "\n" for l in color_to_species[c]])
+                # copy over placements
+        #assert all([n.get_label()[:7] != '-------' for n in tstree.traverse_postorder()]), "cannot have leading '-------' in node label (don't ask)"
+
+        placement_map = dict()
+        for i, n in enumerate(tstree.traverse_postorder()):
+            if not hasattr(n, 'label'):
+                n.set_label(f'-------{i}')
+            if hasattr(n, 'placements'):
+                if not n.is_root() and n.color == n.parent.color:
+                    placement_map[n.get_label()] = placement_map.get(n.get_label(), []) + n.placements
+                elif n.is_leaf():
+                    placement_map[n.parent.get_label()] = placement_map.get(n.parent.get_label(), []) + n.placements
+                else:
+                    placement_map[n.child_nodes()[0].get_label()] = placement_map.get(n.child_nodes()[0].get_label(), []) + n.placements
+                #assert n.color == n.parent.color, "pls send help"
+
+        placement_length = len([p for l, pl in placement_map.items() for p in pl])
+        assert num_placements == placement_length, f"{num_placements} != {placement_length}"
+        tree_catalog = {k:tstree.extract_tree_with(labels=v) for k, v in color_to_species.items()}
+        
+        # reattach placements
+        for _, t in tree_catalog.items():
+            for n in t.traverse_postorder():
+                if n.get_label() in placement_map:
+                    n.placements = placement_map[n.get_label()]
+                else: #TODO remove
+                    n.placements = []
+
+        placement_length = len([p for _, t in tree_catalog.items() for n in t.traverse_postorder() for p in n.placements])
+        assert num_placements == placement_length, f"{num_placements} != {placement_length}"
+        # create color spanning tree because it's necessary for snakemake
+        #open(join(options.output_fp, "color_spanning_tree.nwk"), "a").close()
+    #TODO above function might return disjoint clustering
+    
+    else:
         copyts = tstree.extract_tree_with(labels=tstree.labels())
         for n in copyts.traverse_preorder():
             n.outgroup = False
