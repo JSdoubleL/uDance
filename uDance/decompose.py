@@ -169,7 +169,6 @@ def decompose(options):
         #     else:
         #         colors[n.color] += [n]
 
-    Path(options.output_fp).mkdir(parents=True, exist_ok=True)
     color_spanning_tree, color_to_node_map = build_color_spanning_tree(tstree)
     color_spanning_tree.write_tree_newick(join(options.output_fp, "color_spanning_tree.nwk"))
 
@@ -196,15 +195,17 @@ def decompose(options):
                 # copy over placements
         #assert all([n.get_label()[:7] != '-------' for n in tstree.traverse_postorder()]), "cannot have leading '-------' in node label (don't ask)"
         #tstree.root.color = tstree.root.child_nodes()[0].color
-        placement_map = dict()
+        # placement_map = dict()
+        color_to_placements = dict()
         for i, n in enumerate(tstree.traverse_postorder()):
-            if not hasattr(n, 'label'):
-                n.set_label(f'-------{i}')
+            # if not hasattr(n, 'label'):
+            #     n.set_label(f'-------{i}')
             if hasattr(n, 'placements'):
-                for n2, _ in n.traverse_bfs():
-                    if not n2.is_root() and n2.color == n2.parent.color:
-                        placement_map[n2.get_label()] = placement_map.get(n2.get_label(), []) + n.placements
-                        break
+                color_to_placements[n.color] = color_to_placements.get(n.color, []) + n.placements
+                # for n2, _ in n.traverse_bfs():
+                #     if not n2.is_root() and n2.color == n2.parent.color:
+                #         placement_map[n2.get_label()] = placement_map.get(n2.get_label(), []) + n.placements
+                #         break
                 # cur = n
                 # while not cur.is_root() and cur.color != cur.parent.color:
                 #     cur.traverse_bfs()
@@ -219,20 +220,27 @@ def decompose(options):
                 #     placement_map[n.child_nodes()[0].get_label()] = placement_map.get(n.child_nodes()[0].get_label(), []) + n.placements
                 #assert n.color == n.parent.color, "pls send help"
 
-        placement_length = len([p for l, pl in placement_map.items() for p in pl])
+        placement_length = len([p for l, pl in color_to_placements.items() for p in pl])
         assert num_placements == placement_length, f"{num_placements} != {placement_length}; some taxa were never mapped onto the backbone"
+        
         tree_catalog = {k:tstree.extract_tree_with(labels=v, suppress_unifurcations=False) for k, v in color_to_species.items()}
         
-        # reattach placements
-        for _, t in tree_catalog.items():
-            for n in t.traverse_postorder():
-                if n.get_label() in placement_map:
-                    n.placements = placement_map[n.get_label()]
-                else: #TODO remove
-                    n.placements = []
+        # # reattach placements
+        # for _, t in tree_catalog.items():
+        #     for n in t.traverse_postorder():
+        #         if n.get_label() in placement_map:
+        #             n.placements = placement_map[n.get_label()]
+        #         else: #TODO remove
+        #             n.placements = []
+
+        for c, t in tree_catalog.items():
+            t.root.placements = color_to_placements[c]
+            for u in t.traverse_postorder():
+                if not hasattr(u, 'placements'):
+                    u.placements = []
 
         placement_length = len([p for _, t in tree_catalog.items() for n in t.traverse_postorder() for p in n.placements])
-        assert num_placements == placement_length, f"{num_placements} != {placement_length}; some taxa were lost when decomposing the tree"
+        assert num_placements == placement_length, f"{num_placements} != {placement_length}; some taxa were lost (or added???) when decomposing the tree"
         # create color spanning tree because it's necessary for snakemake
         #open(join(options.output_fp, "color_spanning_tree.nwk"), "a").close()
     #TODO above function might return disjoint clustering
